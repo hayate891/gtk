@@ -15612,3 +15612,16 @@ gtk_widget_get_cursor (GtkWidget *widget)
 {
   return widget->priv->cursor;
 }
+
+void
+gtk_widget_set_pass_through (GtkWidget *widget,
+                             gboolean   pass_through)
+{
+  widget->priv->pass_through = !!pass_through;
+}
+
+gboolean
+gtk_widget_get_pass_through (GtkWidget *widget)
+{
+  return widget->priv->pass_through;
+}
