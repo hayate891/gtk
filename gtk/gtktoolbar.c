@@ -267,13 +267,6 @@ static void       gtk_toolbar_measure              (GtkCssGadget   *gadget,
                                                     int            *minimum_baseline,
                                                     int            *natural_baseline,
                                                     gpointer        data);
-static gboolean   gtk_toolbar_render               (GtkCssGadget *gadget,
-                                                    GtkSnapshot  *snapshot,
-                                                    int           x,
-                                                    int           y,
-                                                    int           width,
-                                                    int           height,
-                                                    gpointer      data);
 static void       gtk_toolbar_pressed_cb           (GtkGestureMultiPress *gesture,
                                                     int                   n_press,
                                                     double                x,
@@ -649,7 +642,7 @@ gtk_toolbar_init (GtkToolbar *toolbar)
                                                      widget,
                                                      gtk_toolbar_measure,
                                                      gtk_toolbar_allocate,
-                                                     gtk_toolbar_render,
+                                                     NULL,
                                                      NULL, NULL);
 
   priv->arrow_button = gtk_toggle_button_new ();
@@ -812,16 +805,10 @@ gtk_toolbar_unrealize (GtkWidget *widget)
   GTK_WIDGET_CLASS (gtk_toolbar_parent_class)->unrealize (widget);
 }
 
-static gboolean
-gtk_toolbar_render (GtkCssGadget *gadget,
-                    GtkSnapshot  *snapshot,
-                    int           x,
-                    int           y,
-                    int           width,
-                    int           height,
-                    gpointer      data)
+static void
+gtk_toolbar_snapshot (GtkWidget   *widget,
+                      GtkSnapshot *snapshot)
 {
-  GtkWidget *widget = gtk_css_gadget_get_owner (gadget);
   GtkToolbar *toolbar = GTK_TOOLBAR (widget);
   GtkToolbarPrivate *priv = toolbar->priv;
   GList *list;
@@ -829,25 +816,13 @@ gtk_toolbar_render (GtkCssGadget *gadget,
   for (list = priv->content; list != NULL; list = list->next)
     {
       ToolbarContent *content = list->data;
-      
+
       toolbar_content_snapshot (content, GTK_CONTAINER (widget), snapshot);
     }
-  
+
   gtk_widget_snapshot_child (widget,
                              priv->arrow_button,
                              snapshot);
-
-  return FALSE;
-}
-
-static void
-gtk_toolbar_snapshot (GtkWidget   *widget,
-                      GtkSnapshot *snapshot)
-{
-  GtkToolbar *toolbar = GTK_TOOLBAR (widget);
-  GtkToolbarPrivate *priv = toolbar->priv;
-
-  gtk_css_gadget_snapshot (priv->gadget, snapshot);
 }
 
 static void
