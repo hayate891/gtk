@@ -1932,31 +1932,6 @@ gtk_scrolled_window_snapshot_undershoot (GtkScrolledWindow *scrolled_window,
     }
 }
 
-static gboolean
-gtk_scrolled_window_render (GtkCssGadget *gadget,
-                            GtkSnapshot  *snapshot,
-                            int           x,
-                            int           y,
-                            int           width,
-                            int           height,
-                            gpointer      data)
-{
-  GtkWidget *widget = gtk_css_gadget_get_owner (gadget);
-  GtkScrolledWindow *scrolled_window = GTK_SCROLLED_WINDOW (widget);
-  GtkScrolledWindowPrivate *priv = scrolled_window->priv;
-
-  if (priv->hscrollbar_visible &&
-      priv->vscrollbar_visible)
-    gtk_scrolled_window_snapshot_scrollbars_junction (scrolled_window, snapshot);
-
-  GTK_WIDGET_CLASS (gtk_scrolled_window_parent_class)->snapshot (widget, snapshot);
-
-  gtk_scrolled_window_snapshot_undershoot (scrolled_window, snapshot);
-  gtk_scrolled_window_snapshot_overshoot (scrolled_window, snapshot);
-
-  return FALSE;
-}
-
 static void
 gtk_scrolled_window_init (GtkScrolledWindow *scrolled_window)
 {
@@ -2040,7 +2015,7 @@ gtk_scrolled_window_init (GtkScrolledWindow *scrolled_window)
                                                      widget,
                                                      gtk_scrolled_window_measure,
                                                      gtk_scrolled_window_allocate,
-                                                     gtk_scrolled_window_render,
+                                                     NULL,
                                                      NULL, NULL);
   for (i = 0; i < 4; i++)
     {
@@ -2849,7 +2824,14 @@ gtk_scrolled_window_snapshot (GtkWidget   *widget,
   GtkScrolledWindow *scrolled_window = GTK_SCROLLED_WINDOW (widget);
   GtkScrolledWindowPrivate *priv = scrolled_window->priv;
 
-  gtk_css_gadget_snapshot (priv->gadget, snapshot);
+  if (priv->hscrollbar_visible &&
+      priv->vscrollbar_visible)
+    gtk_scrolled_window_snapshot_scrollbars_junction (scrolled_window, snapshot);
+
+  GTK_WIDGET_CLASS (gtk_scrolled_window_parent_class)->snapshot (widget, snapshot);
+
+  gtk_scrolled_window_snapshot_undershoot (scrolled_window, snapshot);
+  gtk_scrolled_window_snapshot_overshoot (scrolled_window, snapshot);
 }
 
 static gboolean
