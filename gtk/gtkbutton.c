@@ -125,7 +125,6 @@ static void gtk_button_map (GtkWidget * widget);
 static void gtk_button_unmap (GtkWidget * widget);
 static void gtk_button_size_allocate (GtkWidget * widget,
 				      GtkAllocation * allocation);
-static void gtk_button_snapshot (GtkWidget * widget, GtkSnapshot *snapshot);
 static gint gtk_button_grab_broken (GtkWidget * widget,
 				    GdkEventGrabBroken * event);
 static gint gtk_button_key_release (GtkWidget * widget, GdkEventKey * event);
@@ -169,13 +168,6 @@ static void     gtk_button_allocate (GtkCssGadget        *gadget,
                                      GtkAllocation       *out_clip,
                                      gpointer             data);
 static void gtk_button_set_child_type (GtkButton *button, guint child_type);
-static gboolean gtk_button_render   (GtkCssGadget        *gadget,
-                                     GtkSnapshot         *snapshot,
-                                     int                  x,
-                                     int                  y,
-                                     int                  width,
-                                     int                  height,
-                                     gpointer             data);
 
 static GParamSpec *props[LAST_PROP] = { NULL, };
 static guint button_signals[LAST_SIGNAL] = { 0 };
@@ -230,7 +222,6 @@ gtk_button_class_init (GtkButtonClass *klass)
   widget_class->map = gtk_button_map;
   widget_class->unmap = gtk_button_unmap;
   widget_class->size_allocate = gtk_button_size_allocate;
-  widget_class->snapshot = gtk_button_snapshot;
   widget_class->grab_broken_event = gtk_button_grab_broken;
   widget_class->key_release_event = gtk_button_key_release;
   widget_class->enter_notify_event = gtk_button_enter_notify;
@@ -479,7 +470,7 @@ gtk_button_init (GtkButton *button)
                                                      GTK_WIDGET (button),
                                                      gtk_button_measure,
                                                      gtk_button_allocate,
-                                                     gtk_button_render,
+                                                     NULL,
                                                      NULL,
                                                      NULL);
 
@@ -894,31 +885,6 @@ gtk_button_allocate (GtkCssGadget        *gadget,
                               border_allocation.width,
                               border_allocation.height);
     }
-}
-
-static void
-gtk_button_snapshot (GtkWidget   *widget,
-                     GtkSnapshot *snapshot)
-{
-  gtk_css_gadget_snapshot (GTK_BUTTON (widget)->priv->gadget, snapshot);
-}
-
-static gboolean
-gtk_button_render (GtkCssGadget *gadget,
-                   GtkSnapshot  *snapshot,
-                   int           x,
-                   int           y,
-                   int           width,
-                   int           height,
-                   gpointer      data)
-{
-  GtkWidget *widget;
-
-  widget = gtk_css_gadget_get_owner (gadget);
-
-  GTK_WIDGET_CLASS (gtk_button_parent_class)->snapshot (widget, snapshot);
-
-  return gtk_widget_has_visible_focus (widget);
 }
 
 static void
