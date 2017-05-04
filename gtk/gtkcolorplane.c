@@ -185,14 +185,13 @@ plane_size_allocate (GtkWidget     *widget,
 {
   GtkColorPlane *plane = GTK_COLOR_PLANE (widget);
 
-  GTK_WIDGET_CLASS (gtk_color_plane_parent_class)->size_allocate (widget, allocation);
-
   if (gtk_widget_get_realized (widget))
     gdk_window_move_resize (plane->priv->input_window,
                             allocation->x, allocation->y,
                             allocation->width, allocation->height);
 
   create_surface (plane);
+  gtk_widget_set_clip (widget, allocation);
 }
 
 static void

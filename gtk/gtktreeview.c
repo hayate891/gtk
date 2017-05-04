@@ -2836,6 +2836,8 @@ gtk_tree_view_size_allocate (GtkWidget     *widget,
       gtk_tree_path_free (path);
       gtk_widget_size_allocate (child->widget, &child_rect);
     }
+
+  gtk_widget_set_clip (widget, allocation);
 }
 
 /* Grabs the focus and unsets the GTK_TREE_VIEW_DRAW_KEYFOCUS flag */
