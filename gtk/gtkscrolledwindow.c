@@ -29,7 +29,6 @@
 #include "gtkadjustment.h"
 #include "gtkadjustmentprivate.h"
 #include "gtkbindings.h"
-#include "gtkcsscustomgadgetprivate.h"
 #include "gtkdnd.h"
 #include "gtkintl.h"
 #include "gtkmain.h"
@@ -210,7 +209,6 @@ struct _GtkScrolledWindowPrivate
 
   GdkWindow     *view_window;
 
-  GtkCssGadget  *gadget;
   GtkCssNode    *overshoot_node[4];
   GtkCssNode    *undershoot_node[4];
 
@@ -349,14 +347,13 @@ static void     gtk_scrolled_window_adjustment_changed (GtkAdjustment     *adjus
 static void     gtk_scrolled_window_adjustment_value_changed (GtkAdjustment     *adjustment,
                                                               gpointer           data);
 static gboolean gtk_widget_should_animate              (GtkWidget           *widget);
-
-static void gtk_scrolled_window_measure_ (GtkWidget      *widget,
-                                          GtkOrientation  orientation,
-                                          int             for_size,
-                                          int            *minimum,
-                                          int            *natural,
-                                          int            *minimum_baseline,
-                                          int            *natural_baseline);
+static void     gtk_scrolled_window_measure (GtkWidget      *widget,
+                                             GtkOrientation  orientation,
+                                             int             for_size,
+                                             int            *minimum_size,
+                                             int            *natural_size,
+                                             int            *minimum_baseline,
+                                             int            *natural_baseline);
 static void  gtk_scrolled_window_map                   (GtkWidget           *widget);
 static void  gtk_scrolled_window_unmap                 (GtkWidget           *widget);
 static void  gtk_scrolled_window_realize               (GtkWidget           *widget);
@@ -517,7 +514,7 @@ gtk_scrolled_window_class_init (GtkScrolledWindowClass *class)
   widget_class->size_allocate = gtk_scrolled_window_size_allocate;
   widget_class->scroll_event = gtk_scrolled_window_scroll_event;
   widget_class->focus = gtk_scrolled_window_focus;
-  widget_class->measure = gtk_scrolled_window_measure_;
+  widget_class->measure = gtk_scrolled_window_measure;
   widget_class->map = gtk_scrolled_window_map;
   widget_class->unmap = gtk_scrolled_window_unmap;
   widget_class->grab_notify = gtk_scrolled_window_grab_notify;
@@ -1391,13 +1388,9 @@ captured_event_cb (GtkWidget *widget,
 }
 
 static void
-gtk_scrolled_window_allocate (GtkCssGadget        *gadget,
-                              const GtkAllocation *allocation,
-                              int                  baseline,
-                              GtkAllocation       *out_clip,
-                              gpointer             data)
+gtk_scrolled_window_size_allocate (GtkWidget     *widget,
+                                   GtkAllocation *allocation)
 {
-  GtkWidget *widget = gtk_css_gadget_get_owner (gadget);
   GtkScrolledWindow *scrolled_window = GTK_SCROLLED_WINDOW (widget);
   GtkScrolledWindowPrivate *priv = scrolled_window->priv;
   GtkBin *bin;
@@ -1674,19 +1667,24 @@ gtk_scrolled_window_allocate (GtkCssGadget        *gadget,
     }
 
   gtk_scrolled_window_check_attach_pan_gesture (scrolled_window);
+
+  if (gtk_widget_get_realized (widget))
+    gdk_window_move_resize (priv->view_window,
+                            allocation->x, allocation->y,
+                            allocation->width, allocation->height);
+
+  gtk_widget_set_clip (widget, allocation);
 }
 
 static void
-gtk_scrolled_window_measure (GtkCssGadget   *gadget,
+gtk_scrolled_window_measure (GtkWidget      *widget,
                              GtkOrientation  orientation,
                              int             for_size,
                              int            *minimum_size,
                              int            *natural_size,
                              int            *minimum_baseline,
-                             int            *natural_baseline,
-                             gpointer        data)
+                             int            *natural_baseline)
 {
-  GtkWidget *widget = gtk_css_gadget_get_owner (gadget);
   GtkScrolledWindow *scrolled_window = GTK_SCROLLED_WINDOW (widget);
   GtkScrolledWindowPrivate *priv = scrolled_window->priv;
   GtkBin *bin = GTK_BIN (scrolled_window);
@@ -2011,12 +2009,6 @@ gtk_scrolled_window_init (GtkScrolledWindow *scrolled_window)
   _gtk_widget_set_captured_event_handler (widget, captured_event_cb);
 
   widget_node = gtk_widget_get_css_node (widget);
-  priv->gadget = gtk_css_custom_gadget_new_for_node (widget_node,
-                                                     widget,
-                                                     gtk_scrolled_window_measure,
-                                                     gtk_scrolled_window_allocate,
-                                                     NULL,
-                                                     NULL, NULL);
   for (i = 0; i < 4; i++)
     {
       priv->overshoot_node[i] = gtk_css_node_new ();
@@ -2657,7 +2649,6 @@ gtk_scrolled_window_finalize (GObject *object)
   g_clear_object (&priv->swipe_gesture);
   g_clear_object (&priv->long_press_gesture);
   g_clear_object (&priv->pan_gesture);
-  g_clear_object (&priv->gadget);
   g_clear_pointer (&priv->scroll_history, (GDestroyNotify) g_array_unref);
 
   G_OBJECT_CLASS (gtk_scrolled_window_parent_class)->finalize (object);
@@ -2985,7 +2976,7 @@ gtk_scrolled_window_relative_allocation (GtkWidget     *widget,
   gtk_widget_measure (priv->hscrollbar, GTK_ORIENTATION_VERTICAL, -1,
                       &sb_height, NULL, NULL, NULL);
 
-  gtk_css_gadget_get_content_allocation (priv->gadget, &content_allocation, NULL);
+  gtk_widget_get_content_allocation (widget, &content_allocation);
   gtk_widget_get_allocation (widget, &widget_allocation);
 
   allocation->x = content_allocation.x - widget_allocation.x;
@@ -3156,32 +3147,6 @@ gtk_scrolled_window_allocate_scrollbar (GtkScrolledWindow *scrolled_window,
     }
 
   *allocation = child_allocation;
-}
-
-static void
-gtk_scrolled_window_size_allocate (GtkWidget     *widget,
-				   GtkAllocation *allocation)
-{
-  GtkScrolledWindow *scrolled_window;
-  GtkScrolledWindowPrivate *priv;
-  GtkAllocation clip;
-
-  scrolled_window = GTK_SCROLLED_WINDOW (widget);
-  priv = scrolled_window->priv;
-
-  gtk_widget_set_allocation (widget, allocation);
-
-  if (gtk_widget_get_realized (widget))
-    gdk_window_move_resize (priv->view_window,
-                            allocation->x, allocation->y,
-                            allocation->width, allocation->height);
-
-  gtk_css_gadget_allocate (priv->gadget,
-                           allocation,
-                           gtk_widget_get_allocated_baseline (widget),
-                           &clip);
-
-  gtk_widget_set_clip (widget, &clip);
 }
 
 static void
@@ -3796,22 +3761,6 @@ gtk_scrolled_window_remove (GtkContainer *container,
   GTK_CONTAINER_CLASS (gtk_scrolled_window_parent_class)->remove (container, scrollable_child);
 
   priv->auto_added_viewport = FALSE;
-}
-
-static void
-gtk_scrolled_window_measure_ (GtkWidget      *widget,
-                              GtkOrientation  orientation,
-                              int             for_size,
-                              int            *minimum,
-                              int            *natural,
-                              int            *minimum_baseline,
-                              int            *natural_baseline)
-{
-  gtk_css_gadget_get_preferred_size (GTK_SCROLLED_WINDOW (widget)->priv->gadget,
-                                     orientation,
-                                     for_size,
-                                     minimum, natural,
-                                     minimum_baseline, natural_baseline);
 }
 
 static gboolean
