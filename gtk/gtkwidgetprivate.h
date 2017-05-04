@@ -93,6 +93,8 @@ struct _GtkWidgetPrivate
   guint   halign              : 4;
   guint   valign              : 4;
 
+  guint clip_set : 1;
+
   guint8 alpha;
   guint8 user_alpha;
 
@@ -312,6 +314,8 @@ void              gtk_widget_focus_sort                    (GtkWidget        *wi
 gboolean          gtk_widget_focus_move                    (GtkWidget        *widget,
                                                             GtkDirectionType  direction,
                                                             GPtrArray        *focus_order);
+void              gtk_widget_get_content_allocation        (GtkWidget        *widget,
+                                                            GtkAllocation    *allocation);
 
 /* inline getters */
 
