@@ -154,19 +154,6 @@ static void gtk_button_measure_ (GtkWidget      *widget,
                                  int            *natural,
                                  int            *minimum_baseline,
                                  int            *natural_baseline);
-static void     gtk_button_measure  (GtkCssGadget        *gadget,
-                                     GtkOrientation       orientation,
-                                     int                  for_size,
-                                     int                 *minimum_size,
-                                     int                 *natural_size,
-                                     int                 *minimum_baseline,
-                                     int                 *natural_baseline,
-                                     gpointer             data);
-static void     gtk_button_allocate (GtkCssGadget        *gadget,
-                                     const GtkAllocation *allocation,
-                                     int                  baseline,
-                                     GtkAllocation       *out_clip,
-                                     gpointer             data);
 static void gtk_button_set_child_type (GtkButton *button, guint child_type);
 
 static GParamSpec *props[LAST_PROP] = { NULL, };
@@ -468,8 +455,8 @@ gtk_button_init (GtkButton *button)
 
   priv->gadget = gtk_css_custom_gadget_new_for_node (gtk_widget_get_css_node (GTK_WIDGET (button)),
                                                      GTK_WIDGET (button),
-                                                     gtk_button_measure,
-                                                     gtk_button_allocate,
+                                                     NULL,
+                                                     NULL,
                                                      NULL,
                                                      NULL,
                                                      NULL);
@@ -840,51 +827,30 @@ gtk_button_size_allocate (GtkWidget     *widget,
 {
   GtkButton *button = GTK_BUTTON (widget);
   GtkButtonPrivate *priv = button->priv;
-  GtkAllocation clip;
-
-  gtk_widget_set_allocation (widget, allocation);
-  gtk_css_gadget_allocate (priv->gadget,
-                           allocation,
-                           gtk_widget_get_allocated_baseline (widget),
-                           &clip);
-
-  gtk_widget_set_clip (widget, &clip);
-}
-
-static void
-gtk_button_allocate (GtkCssGadget        *gadget,
-                     const GtkAllocation *allocation,
-                     int                  baseline,
-                     GtkAllocation       *out_clip,
-                     gpointer             unused)
-{
-  GtkWidget *widget;
+  GtkAllocation clip = *allocation;
   GtkWidget *child;
-
-  widget = gtk_css_gadget_get_owner (gadget);
-
-  *out_clip = *allocation;
 
   child = gtk_bin_get_child (GTK_BIN (widget));
   if (child && gtk_widget_get_visible (child))
     {
-      GtkAllocation clip;
-
-      gtk_widget_size_allocate_with_baseline (child, (GtkAllocation *)allocation, baseline);
+      gtk_widget_size_allocate_with_baseline (child, (GtkAllocation *)allocation,
+                                              gtk_widget_get_allocated_baseline (widget));
       gtk_widget_get_clip (child, &clip);
-      gdk_rectangle_union (&clip, out_clip, out_clip);
     }
 
   if (gtk_widget_get_realized (widget))
     {
-      GtkAllocation border_allocation;
-      gtk_css_gadget_get_border_allocation (gadget, &border_allocation, NULL);
-      gdk_window_move_resize (GTK_BUTTON (widget)->priv->event_window,
-                              border_allocation.x,
-                              border_allocation.y,
-                              border_allocation.width,
-                              border_allocation.height);
+      GtkAllocation widget_alloc;
+      gtk_widget_get_allocation (widget, &widget_alloc);
+
+      gdk_window_move_resize (priv->event_window,
+                              widget_alloc.x,
+                              widget_alloc.y,
+                              widget_alloc.width,
+                              widget_alloc.height);
     }
+
+  gtk_widget_set_clip (widget, &clip);
 }
 
 static void
@@ -1049,22 +1015,16 @@ gtk_button_finish_activate (GtkButton *button,
     gtk_button_clicked (button);
 }
 
-
 static void
-gtk_button_measure (GtkCssGadget   *gadget,
-		    GtkOrientation  orientation,
-                    int             for_size,
-		    int            *minimum,
-		    int            *natural,
-		    int            *minimum_baseline,
-		    int            *natural_baseline,
-                    gpointer        data)
+gtk_button_measure_ (GtkWidget      *widget,
+                     GtkOrientation  orientation,
+                     int             for_size,
+                     int            *minimum,
+                     int            *natural,
+                     int            *minimum_baseline,
+                     int            *natural_baseline)
 {
-  GtkWidget *widget;
-  GtkWidget *child;
-
-  widget = gtk_css_gadget_get_owner (gadget);
-  child = gtk_bin_get_child (GTK_BIN (widget));
+  GtkWidget *child = gtk_bin_get_child (GTK_BIN (widget));
 
   if (child && gtk_widget_get_visible (child))
     {
@@ -1083,22 +1043,6 @@ gtk_button_measure (GtkCssGadget   *gadget,
       if (natural_baseline)
         *natural_baseline = 0;
     }
-}
-
-static void
-gtk_button_measure_ (GtkWidget      *widget,
-                     GtkOrientation  orientation,
-                     int             for_size,
-                     int            *minimum,
-                     int            *natural,
-                     int            *minimum_baseline,
-                     int            *natural_baseline)
-{
-  gtk_css_gadget_get_preferred_size (GTK_BUTTON (widget)->priv->gadget,
-                                     orientation,
-                                     for_size,
-                                     minimum, natural,
-                                     minimum_baseline, natural_baseline);
 }
 
 /**
