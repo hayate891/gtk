@@ -3723,9 +3723,3 @@ gtk_range_get_slider_gadget (GtkRange *range)
 {
   return range->priv->slider_gadget;
 }
-
-GtkCssGadget *
-gtk_range_get_gadget (GtkRange *range)
-{
-  return range->priv->gadget;
-}
