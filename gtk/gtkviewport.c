@@ -614,8 +614,6 @@ gtk_viewport_size_allocate (GtkWidget     *widget,
        widget_allocation.height != allocation->height))
     gdk_window_invalidate_rect (gtk_widget_get_window (widget), NULL, FALSE);
 
-  gtk_widget_set_allocation (widget, allocation);
-
   g_object_freeze_notify (G_OBJECT (hadjustment));
   g_object_freeze_notify (G_OBJECT (vadjustment));
 

@@ -868,8 +868,6 @@ gtk_layout_size_allocate (GtkWidget     *widget,
   GtkLayoutPrivate *priv = layout->priv;
   GList *tmp_list;
 
-  gtk_widget_set_allocation (widget, allocation);
-
   tmp_list = priv->children;
 
   while (tmp_list)

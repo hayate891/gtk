@@ -397,8 +397,6 @@ gtk_tool_item_size_allocate (GtkWidget     *widget,
   GtkAllocation child_allocation;
   GtkWidget *child;
 
-  gtk_widget_set_allocation (widget, allocation);
-
   if (toolitem->priv->drag_window)
     gdk_window_move_resize (toolitem->priv->drag_window,
                             allocation->x,

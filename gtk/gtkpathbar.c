@@ -512,8 +512,6 @@ gtk_path_bar_size_allocate (GtkWidget     *widget,
   gint down_slider_offset = 0;
   GtkRequisition child_requisition;
 
-  gtk_widget_set_allocation (widget, allocation);
-
   if (gtk_widget_get_realized (widget))
     gdk_window_move_resize (path_bar->priv->event_window,
 			    allocation->x, allocation->y,
