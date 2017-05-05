@@ -74,9 +74,6 @@ gtk_center_box_size_allocate (GtkWidget     *widget,
   int start_size, end_size;
   int min, nat;
 
-  GTK_WIDGET_CLASS (gtk_center_box_parent_class)->size_allocate (widget, allocation);
-
-
   // TODO: Allocate natural sizes if possible?
 
   /* Start Box */
