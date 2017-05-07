@@ -87,9 +87,8 @@ struct _GtkRangePrivate
   GdkWindow         *event_window;
 
   GtkWidget    *trough_widget;
-  GtkCssGadget *trough_gadget;
-  GtkCssGadget *fill_gadget;
-  GtkCssGadget *highlight_gadget;
+  GtkWidget    *fill_widget;
+  GtkWidget    *highlight_widget;
   GtkCssGadget *slider_gadget;
 
   GtkOrientation     orientation;
@@ -715,19 +714,22 @@ static void
 update_highlight_position (GtkRange *range)
 {
   GtkRangePrivate *priv = range->priv;
+  GtkStyleContext *context;
 
-  if (!priv->highlight_gadget)
+  if (!priv->highlight_widget)
     return;
+
+  context = gtk_widget_get_style_context (priv->highlight_widget);
 
   if (should_invert (range))
     {
-      gtk_css_gadget_remove_class (priv->highlight_gadget, GTK_STYLE_CLASS_TOP);
-      gtk_css_gadget_add_class (priv->highlight_gadget, GTK_STYLE_CLASS_BOTTOM);
+      gtk_style_context_remove_class (context, GTK_STYLE_CLASS_TOP);
+      gtk_style_context_add_class (context, GTK_STYLE_CLASS_BOTTOM);
     }
   else
     {
-      gtk_css_gadget_remove_class (priv->highlight_gadget, GTK_STYLE_CLASS_BOTTOM);
-      gtk_css_gadget_add_class (priv->highlight_gadget, GTK_STYLE_CLASS_TOP);
+      gtk_style_context_remove_class (context, GTK_STYLE_CLASS_BOTTOM);
+      gtk_style_context_add_class (context, GTK_STYLE_CLASS_TOP);
     }
 }
 
@@ -735,19 +737,22 @@ static void
 update_fill_position (GtkRange *range)
 {
   GtkRangePrivate *priv = range->priv;
+  GtkStyleContext *context;
 
-  if (!priv->fill_gadget)
+  if (!priv->fill_widget)
     return;
+
+  context = gtk_widget_get_style_context (priv->fill_widget);
 
   if (should_invert (range))
     {
-      gtk_css_gadget_remove_class (priv->fill_gadget, GTK_STYLE_CLASS_TOP);
-      gtk_css_gadget_add_class (priv->fill_gadget, GTK_STYLE_CLASS_BOTTOM);
+      gtk_style_context_remove_class (context, GTK_STYLE_CLASS_TOP);
+      gtk_style_context_add_class (context, GTK_STYLE_CLASS_BOTTOM);
     }
   else
     {
-      gtk_css_gadget_remove_class (priv->fill_gadget, GTK_STYLE_CLASS_BOTTOM);
-      gtk_css_gadget_add_class (priv->fill_gadget, GTK_STYLE_CLASS_TOP);
+      gtk_style_context_remove_class (context, GTK_STYLE_CLASS_BOTTOM);
+      gtk_style_context_add_class (context, GTK_STYLE_CLASS_TOP);
     }
 }
 
@@ -1130,23 +1135,14 @@ gtk_range_set_show_fill_level (GtkRange *range,
 
   if (show_fill_level)
     {
-      priv->fill_gadget = gtk_css_custom_gadget_new ("fill",
-                                                     GTK_WIDGET (range),
-                                                     NULL, NULL,
-                                                     NULL, NULL, NULL,
-                                                     NULL, NULL);
-      gtk_css_node_set_parent (gtk_css_gadget_get_node (priv->fill_gadget),
-                               gtk_widget_get_css_node (priv->trough_widget));
-
-      /*gtk_css_gadget_set_state (priv->fill_gadget,*/
-                                /*gtk_css_node_get_state (gtk_css_gadget_get_node (priv->trough_gadget)));*/
-
+      priv->fill_widget = gtk_gizmo_new ("fill", NULL, NULL, NULL);
+      gtk_widget_set_parent (priv->fill_widget, priv->trough_widget);
       update_fill_position (range);
     }
   else
     {
-      gtk_css_node_set_parent (gtk_css_gadget_get_node (priv->fill_gadget), NULL);
-      g_clear_object (&priv->fill_gadget);
+      gtk_widget_unparent (priv->fill_widget);
+      priv->fill_widget = NULL;
     }
 
   g_object_notify_by_pspec (G_OBJECT (range), properties[PROP_SHOW_FILL_LEVEL]);
@@ -1329,9 +1325,14 @@ gtk_range_finalize (GObject *object)
   g_clear_object (&priv->multipress_gesture);
   g_clear_object (&priv->long_press_gesture);
 
-  g_clear_object (&priv->fill_gadget);
-  g_clear_object (&priv->highlight_gadget);
   g_clear_object (&priv->slider_gadget);
+
+
+  if (priv->fill_widget)
+    gtk_widget_unparent (priv->fill_widget);
+
+  if (priv->highlight_widget)
+    gtk_widget_unparent (priv->highlight_widget);
 
   gtk_widget_unparent (priv->trough_widget);
 
@@ -1357,22 +1358,22 @@ gtk_range_measure_trough (GtkGizmo       *gizmo,
                                      minimum, natural,
                                      NULL, NULL);
 
-  if (priv->fill_gadget)
+  if (priv->fill_widget)
     {
-      gtk_css_gadget_get_preferred_size (priv->fill_gadget,
-                                         orientation, for_size,
-                                         &min, &nat,
-                                         NULL, NULL);
+      gtk_widget_measure (priv->fill_widget,
+                          orientation, for_size,
+                          &min, &nat,
+                          NULL, NULL);
       *minimum = MAX (*minimum, min);
       *natural = MAX (*natural, nat);
     }
 
-  if (priv->highlight_gadget)
+  if (priv->highlight_widget)
     {
-      gtk_css_gadget_get_preferred_size (priv->highlight_gadget,
-                                         orientation, for_size,
-                                         &min, &nat,
-                                         NULL, NULL);
+      gtk_widget_measure (priv->highlight_widget,
+                          orientation, for_size,
+                          &min, &nat,
+                          NULL, NULL);
       *minimum = MAX (*minimum, min);
       *natural = MAX (*natural, nat);
     }
@@ -1435,11 +1436,14 @@ gtk_range_allocate_trough (GtkGizmo            *gizmo,
   GtkRange *range = GTK_RANGE (widget);
   GtkRangePrivate *priv = range->priv;
   GtkAllocation slider_alloc, widget_alloc;
+  GtkAllocation trough_alloc;
+  double value;
 
   /* Slider */
   gtk_range_calc_marks (range);
 
   gtk_widget_get_allocation (widget, &widget_alloc);
+  gtk_widget_get_allocation (GTK_WIDGET (gizmo), &trough_alloc);
   gtk_range_compute_slider_position (range,
                                      gtk_adjustment_get_value (priv->adjustment),
                                      &slider_alloc);
@@ -1449,6 +1453,9 @@ gtk_range_allocate_trough (GtkGizmo            *gizmo,
                            gtk_widget_get_allocated_baseline (widget),
                            out_clip);
 
+  value = (gtk_adjustment_get_value (priv->adjustment) - gtk_adjustment_get_lower (priv->adjustment)) /
+          (gtk_adjustment_get_upper (priv->adjustment) - gtk_adjustment_get_lower (priv->adjustment));
+
   if (priv->show_fill_level &&
       gtk_adjustment_get_upper (priv->adjustment) - gtk_adjustment_get_page_size (priv->adjustment) -
       gtk_adjustment_get_lower (priv->adjustment) != 0)
@@ -1457,8 +1464,6 @@ gtk_range_allocate_trough (GtkGizmo            *gizmo,
       GtkAllocation fill_alloc, fill_clip;
 
       fill_alloc = *allocation;
-      fill_alloc.x = widget_alloc.x;
-      fill_alloc.y = widget_alloc.y;
 
       level = CLAMP (priv->fill_level,
                      gtk_adjustment_get_lower (priv->adjustment),
@@ -1485,10 +1490,8 @@ gtk_range_allocate_trough (GtkGizmo            *gizmo,
             fill_alloc.y += allocation->height - fill_alloc.height;
         }
 
-      gtk_css_gadget_allocate (priv->fill_gadget,
-                               &fill_alloc,
-                               baseline,
-                               &fill_clip);
+      gtk_widget_size_allocate (priv->fill_widget, &fill_alloc);
+      gtk_widget_get_clip (priv->fill_widget, &fill_clip);
       gdk_rectangle_union (out_clip, &fill_clip, out_clip);
     }
 
@@ -1497,48 +1500,38 @@ gtk_range_allocate_trough (GtkGizmo            *gizmo,
       GtkAllocation highlight_alloc, highlight_clip;
       int min, nat;
 
-      gtk_css_gadget_get_preferred_size (priv->highlight_gadget,
-                                         priv->orientation, -1,
-                                         &min, &nat,
-                                         NULL, NULL);
-
-      highlight_alloc = *allocation;
-      highlight_alloc.x = widget_alloc.x;
-      highlight_alloc.y = widget_alloc.y;
+      gtk_widget_measure (priv->highlight_widget,
+                          priv->orientation, -1,
+                          &min, &nat,
+                          NULL, NULL);
 
       if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
         {
-          int x = slider_alloc.x + (slider_alloc.width / 2) - allocation->x;
+          highlight_alloc.y = allocation->y;
+          highlight_alloc.height = allocation->height;
 
           if (!should_invert (range))
-            {
-              highlight_alloc.width = MAX (x, min);
-            }
+            highlight_alloc.x = allocation->x;
           else
-            {
-              highlight_alloc.x = x;
-              highlight_alloc.width = MAX (widget_alloc.x + allocation->width - x, min);
-            }
+            highlight_alloc.x = allocation->x + (allocation->width * (1 - value));
+
+          highlight_alloc.width = MAX (min, allocation->width * value);
         }
       else
         {
-          int y = slider_alloc.y + (slider_alloc.height / 2) - allocation->y;
+          highlight_alloc.x = allocation->x;
+          highlight_alloc.width = allocation->width;
 
           if (!should_invert (range))
-            {
-              highlight_alloc.height = MAX (y, min);
-            }
+            highlight_alloc.y = allocation->y;
           else
-            {
-              highlight_alloc.height = MAX (widget_alloc.y + allocation->height - y, min);
-              highlight_alloc.y = widget_alloc.y + allocation->height - highlight_alloc.height;
-            }
+            highlight_alloc.y = allocation->y + (allocation->height * (1 - value));
+
+          highlight_alloc.height = MAX (min, allocation->height* value);
         }
 
-      gtk_css_gadget_allocate (priv->highlight_gadget,
-                               &highlight_alloc,
-                               baseline,
-                               &highlight_clip);
+      gtk_widget_size_allocate (priv->highlight_widget, &highlight_alloc);
+      gtk_widget_get_clip (priv->highlight_widget, &highlight_clip);
       gdk_rectangle_union (out_clip, &highlight_clip, out_clip);
     }
 }
@@ -1781,14 +1774,6 @@ update_trough_state (GtkRange *range)
 
   if (priv->grab_location == priv->trough_widget)
     state |= GTK_STATE_FLAG_ACTIVE;
-
-  /* TODO: ??? */
-  /*gtk_css_gadget_set_state (priv->trough_gadget, state);*/
-
-  if (priv->highlight_gadget)
-    gtk_css_gadget_set_state (priv->highlight_gadget, state);
-  if (priv->fill_gadget)
-    gtk_css_gadget_set_state (priv->fill_gadget, state);
 }
 
 static void
@@ -1836,10 +1821,10 @@ gtk_range_render_trough (GtkGizmo    *gizmo,
   if (priv->show_fill_level &&
       gtk_adjustment_get_upper (priv->adjustment) - gtk_adjustment_get_page_size (priv->adjustment) -
       gtk_adjustment_get_lower (priv->adjustment) != 0)
-    gtk_css_gadget_snapshot (priv->fill_gadget, snapshot);
+    gtk_widget_snapshot_child (GTK_WIDGET (gizmo), priv->fill_widget, snapshot);
 
   if (priv->has_origin)
-    gtk_css_gadget_snapshot (priv->highlight_gadget, snapshot);
+    gtk_widget_snapshot_child (GTK_WIDGET (gizmo), priv->highlight_widget, snapshot);
 
   return gtk_widget_has_visible_focus (widget);
 }
@@ -3164,24 +3149,15 @@ _gtk_range_set_has_origin (GtkRange *range,
 
   if (has_origin)
     {
-      priv->highlight_gadget = gtk_css_custom_gadget_new ("highlight",
-                                                          GTK_WIDGET (range),
-                                                          NULL, NULL,
-                                                          NULL, NULL,
-                                                          NULL,
-                                                          NULL, NULL);
-      gtk_css_node_set_parent (gtk_css_gadget_get_node (priv->highlight_gadget),
-                               gtk_widget_get_css_node (priv->trough_widget));
-
-      /*gtk_css_gadget_set_state (priv->highlight_gadget,*/
-                                /*gtk_css_node_get_state (gtk_css_gadget_get_node (priv->trough_gadget)));*/
+      priv->highlight_widget = gtk_gizmo_new ("highlight", NULL, NULL, NULL);
+      gtk_widget_set_parent (priv->highlight_widget, priv->trough_widget);
 
       update_highlight_position (range);
     }
   else
     {
-      gtk_css_node_set_parent (gtk_css_gadget_get_node (priv->highlight_gadget), NULL);
-      g_clear_object (&priv->highlight_gadget);
+      gtk_widget_unparent (priv->highlight_widget);
+      priv->highlight_widget = NULL;
     }
 }
 
