@@ -2500,7 +2500,7 @@ propagate_event (GtkWidget *widget,
                  GtkWidget *topmost)
 {
   gboolean handled_event = FALSE;
-  gboolean (* propagate_func) (GtkWidget *widget, GdkEvent  *event);
+  gboolean (* propagate_func) (GtkWidget *widget, const GdkEvent *event);
 
   propagate_func = captured ? _gtk_widget_captured_event : gtk_widget_event;
 
